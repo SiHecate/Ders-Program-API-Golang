@@ -27,10 +27,9 @@ func ProgramOlustur(c echo.Context) error {
 	var programRequest struct {
 		Baslik          string    `json:"başlık"`
 		Plan            string    `json:"plan"`
-		Gun             string    `json:"gün"` // Gün alanı sadece string olarak kabul edilecek
+		Gun             string    `json:"gün"`
 		BaslangicZamani time.Time `json:"başlangıç_zamanı"`
 		BitisZamani     time.Time `json:"bitiş_zamanı"`
-		Durum           string    `json:"durum"`
 	}
 
 	if err := c.Bind(&programRequest); err != nil {
@@ -48,7 +47,6 @@ func ProgramOlustur(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
 	}
 
-	// Günü zaman cinsine dönüştür
 	gunZamani, err := time.Parse("02-01-2006", programRequest.Gun)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Gün formatı hatalı: " + err.Error()})
@@ -61,7 +59,7 @@ func ProgramOlustur(c echo.Context) error {
 		Gun:             gunZamani,
 		BaslangicZamani: programRequest.BaslangicZamani,
 		BitisZamani:     programRequest.BitisZamani,
-		Durum:           programRequest.Durum,
+		Durum:           "Devam ediyor",
 	}
 
 	if err := database.Conn.Create(&newPlan).Error; err != nil {
