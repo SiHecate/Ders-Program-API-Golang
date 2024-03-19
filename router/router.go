@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	auth "ders-programi/controller/auth"
+	controller "ders-programi/controller/ders-programi"
 
 	"github.com/labstack/echo/v4"
 )
@@ -19,9 +20,13 @@ func Router(e *echo.Echo) {
 		return c.String(http.StatusOK, "pong")
 	})
 
+	// Kullanıcı işlemleri
 	e.POST("auth/signup", auth.Signup)
 	e.POST("auth/login", auth.Login)
 	e.POST("auth/logout", auth.Logout)
 	e.GET("auth/userInfo", auth.UserInfo)
+
+	// Ders programı işlemleri
+	e.POST("auth/programOlustur", controller.ProgramOlustur)
 
 }

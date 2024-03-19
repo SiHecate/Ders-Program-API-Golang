@@ -28,7 +28,9 @@ func Database() {
 }
 
 func Migrate() error {
-	err := Conn.AutoMigrate(&model.User{})
+	err := Conn.AutoMigrate(
+		&model.User{},
+		&model.Plan{})
 	if err != nil {
 		return err
 	}

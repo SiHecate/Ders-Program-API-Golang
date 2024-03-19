@@ -8,10 +8,11 @@ import (
 
 type Plan struct {
 	gorm.Model
-	Başlık           string    `json:"başlık"`
-	Plan             string    `json:"plan"`
-	Gün              time.Time `json:"gün"`
-	Başlangıç_zamanı time.Time `json:"başlangıç_zamanı"`
-	Bitiş_zamanı     time.Time `json:"bitiş_zamanı"`
-	State            string    `json:"durum"`
+	UserID          int       `json:"user_id"`
+	Baslik          string    `json:"başlık"`
+	Plan            string    `json:"plan"`
+	Gun             time.Time `json:"gün"`
+	BaslangicZamani time.Time `json:"başlangıç_zamanı"`
+	BitisZamani     time.Time `json:"bitiş_zamanı"`
+	Durum           string    `json:"durum"`
 }

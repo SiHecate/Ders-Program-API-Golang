@@ -1,9 +1,10 @@
-package controllers
+package controller
 
 import (
 	"ders-programi/database"
 	"ders-programi/model"
 	"ders-programi/utils"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -143,7 +144,10 @@ func Logout(c echo.Context) error {
 }
 
 func UserInfo(c echo.Context) error {
-	userId := c.Get("issuer")
+	userId, err := GetUserIDFromToken(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
+	}
 
 	var user model.User
 	if err := database.Conn.First(&user, userId).Error; err != nil {
@@ -153,4 +157,33 @@ func UserInfo(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, user)
+}
+
+var jwtSecretKey = []byte("your_secret_key")
+
+func GetUserIDFromToken(c echo.Context) (int, error) {
+	cookie, err := c.Request().Cookie("token")
+	if err != nil {
+		return 0, errors.New("Token bulunamadı")
+	}
+	tokenString := cookie.Value
+
+	claims := &jwt.StandardClaims{}
+	jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecretKey, nil
+	})
+
+	if err != nil {
+		if err == jwt.ErrSignatureInvalid {
+			return 0, errors.New("Token imzası geçersiz")
+		}
+		return 0, errors.New("Token doğrulanamamaktadır: " + err.Error())
+	}
+
+	userIdInt, err := strconv.Atoi(claims.Issuer)
+	if err != nil {
+		return 0, errors.New("UserID alınamadı")
+	}
+
+	return userIdInt, nil
 }

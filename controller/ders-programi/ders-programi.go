@@ -1,6 +1,10 @@
 package controller
 
 import (
+	controller "ders-programi/controller/auth"
+	"ders-programi/database"
+	"ders-programi/model"
+	"errors"
 	"net/http"
 	"time"
 
@@ -18,6 +22,7 @@ import (
 */
 
 func ProgramOlustur(c echo.Context) error {
+
 	var programRequest struct {
 		Baslik          string    `json:"başlık"`
 		Plan            string    `json:"plan"`
@@ -31,13 +36,51 @@ func ProgramOlustur(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Hatalı parametre: " + err.Error()})
 	}
 
-	err := zamanKontrol(programRequest.BaslangicZamani, programRequest.BitisZamani) if err != nil {
+	// Zaman kontrolü yapılacak
+	err := zamanKontrol(programRequest.BaslangicZamani, programRequest.BitisZamani)
+
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Zaman kontrol hatası: " + err.Error()})
+	}
+
+	UserID, err := controller.GetUserIDFromToken(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
+	}
+
+	newPlan := model.Plan{
+		UserID:          UserID,
+		Baslik:          programRequest.Baslik,
+		Plan:            programRequest.Plan,
+		Gun:             programRequest.Gun,
+		BaslangicZamani: programRequest.BaslangicZamani,
+		BitisZamani:     programRequest.BitisZamani,
+		Durum:           programRequest.Durum,
+	}
+
+	if err := database.Conn.Create(&newPlan).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Plan oluşturma database tarafında başarısız."})
+	}
+
+	// Başarılı bir şekilde tamamlandı mesajını döndür
+	return c.JSON(http.StatusOK, map[string]interface{}{"message": "Program başarıyla oluşturuldu", "program": newPlan})
+}
+
+func zamanKontrol(baslangic_zamanı time.Time, bitis_zamanı time.Time) error {
+	var existingPlans []model.Plan
+	if err := database.Conn.Find(&existingPlans).Error; err != nil {
 		return err
 	}
 
+	for _, plan := range existingPlans {
+		if baslangic_zamanı.Before(plan.BitisZamani) && bitis_zamanı.After(plan.BaslangicZamani) {
+			return errors.New("zaman aralıkları çakışıyor")
+		}
+	}
+
+	if baslangic_zamanı.After(bitis_zamanı) {
+		return errors.New("başlangıç zamanı, bitiş zamanından sonra olamaz")
+	}
+
 	return nil
-}
-
-func zamanKontrol(başlangıç_zamanı time.Time, bitiş_zamanı time.Time) error {
-
 }
