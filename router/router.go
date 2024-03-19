@@ -21,12 +21,16 @@ func Router(e *echo.Echo) {
 	})
 
 	// Kullanıcı işlemleri
-	e.POST("auth/signup", auth.Signup)
-	e.POST("auth/login", auth.Login)
-	e.POST("auth/logout", auth.Logout)
-	e.GET("auth/userInfo", auth.UserInfo)
+	e.POST("/signup", auth.Signup)
+	e.POST("/login", auth.Login)
+	e.POST("/logout", auth.Logout)
+	e.GET("/userInfo", auth.UserInfo)
 
 	// Ders programı işlemleri
-	e.POST("auth/programOlustur", controller.ProgramOlustur)
+	e.GET("/programlar", controller.Programlar)
+	e.GET("/kullaniciProgramlari", controller.KullanıcıProgramları)
+	e.DELETE("/programKaldir", controller.ProgramSilme)
+	e.POST("/programOlustur", controller.ProgramOlustur)
+	e.PUT("/programGuncelle", controller.ProgramGuncelle)
 
 }
