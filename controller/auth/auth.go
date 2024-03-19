@@ -143,6 +143,49 @@ func Logout(c echo.Context) error {
 	})
 }
 
+// Kullanıcı bilgileri güncelleme
+func UserUpdate(c echo.Context) error {
+	var updateRequest struct {
+		Name     string `json:"name"`
+		Lastname string `json:"lastname"`
+		Email    string `json:"email"`
+	}
+
+	userID, err := GetUserIDFromToken(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
+	}
+
+	if err := c.Bind(&updateRequest); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Hatalı parametre: " + err.Error()})
+	}
+
+	var updatedUser model.User
+	if err := database.Conn.First(&updatedUser, userID).Error; err != nil {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{
+			"error": "Kullanıcı bulunamadı",
+		})
+	}
+
+	if updateRequest.Email != "" {
+		updatedUser.Email = updateRequest.Email
+	}
+	if updateRequest.Name != "" {
+		updatedUser.Name = updateRequest.Name
+	}
+	if updateRequest.Lastname != "" {
+		updatedUser.Lastname = updateRequest.Lastname
+	}
+
+	if err := database.Conn.Save(&updatedUser).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+			"error": "Kullanıcı güncelleme sırasında bir hata oluştu",
+		})
+	}
+
+	return c.JSON(http.StatusOK, updatedUser)
+}
+
 func UserInfo(c echo.Context) error {
 	userId, err := GetUserIDFromToken(c)
 	if err != nil {

@@ -14,10 +14,10 @@ import (
 /*
 - öğrenci günlük planlarını kayıt edebilecek. // BİTTİ
 - eklenen planın hangi gün ve saat aralığı kayıt edilecek. // BİTTİ
-- planların iptal, bitti, yapılıyor gibi state durumları olacak (veri type’ları size bağlı, string veya integer olarak tutabilirsiniz.)
+- planların iptal, bitti, yapılıyor gibi state durumları olacak (veri type’ları size bağlı, string veya integer olarak tutabilirsiniz.) BİTTİ
 - planlar üzerinde güncelleme ve silme işlemleri yapılacak. // BİTTİ
 - eklenen plan tarihinde ve saat aralığında başka bir plan olup olmadığını kontrol etme. // BİTTİ
-- haftalık ve aylık listeleme seçenekleri olacak (bu madde isteğe bağlıdır, yapılması durumunda size artı katkı sağlar.)
+- haftalık ve aylık listeleme seçenekleri olacak (bu madde isteğe bağlıdır, yapılması durumunda size artı katkı sağlar.) // BİTTİ
 - öğrencilerin kayıt olması bilgilerini güncellemesi olacak (bu madde isteğe bağlıdır, yapılması durumunda size artı katkı sağlar.) // BİTTİ
 */
 
@@ -174,13 +174,89 @@ func ProgramSilme(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": "Yetkilendirme hatası: Planı sadece oluşturan kullanıcı veya yönetici silebilir"})
 	}
 
-	// Modeli sil
 	if err := database.Conn.Delete(&existingPlan).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Plan silme işlemi sırasında bir hata oluştu"})
 	}
 
-	// Başarılı bir şekilde tamamlandı mesajını döndür
 	return c.JSON(http.StatusOK, map[string]interface{}{"message": "Program başarıyla silindi"})
+}
+
+func DurumIptal(c echo.Context) error {
+	var programRequest struct {
+		ID uint `json:"id"`
+	}
+
+	if err := c.Bind(&programRequest); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Hatalı parametre: " + err.Error()})
+	}
+
+	UserID, err := controller.GetUserIDFromToken(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
+	}
+
+	var existingPlan model.Plan
+	if err := database.Conn.Where("user_id = ? AND id = ?", UserID, programRequest.ID).First(&existingPlan).Error; err != nil {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{"error": "Plan bulunamadı"})
+	}
+
+	if err := database.Conn.Model(&existingPlan).Update("Durum", "Iptal").Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Plan durumu güncelleme sırasında bir hata oluştu"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"message": "Plan başarıyla iptal edildi"})
+}
+
+func DurumBitti(c echo.Context) error {
+	var programRequest struct {
+		ID uint `json:"id"`
+	}
+
+	if err := c.Bind(&programRequest); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Hatalı parametre: " + err.Error()})
+	}
+
+	UserID, err := controller.GetUserIDFromToken(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
+	}
+
+	var existingPlan model.Plan
+	if err := database.Conn.Where("user_id = ? AND id = ?", UserID, programRequest.ID).First(&existingPlan).Error; err != nil {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{"error": "Plan bulunamadı"})
+	}
+
+	if err := database.Conn.Model(&existingPlan).Update("Durum", "Tamamlandı").Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Plan durumu güncelleme sırasında bir hata oluştu"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"message": "Plan başarıyla tamamlandı"})
+}
+
+func DurumDevam(c echo.Context) error {
+	var programRequest struct {
+		ID uint `json:"id"`
+	}
+
+	if err := c.Bind(&programRequest); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Hatalı parametre: " + err.Error()})
+	}
+
+	UserID, err := controller.GetUserIDFromToken(c)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
+	}
+
+	var existingPlan model.Plan
+	if err := database.Conn.Where("user_id = ? AND id = ?", UserID, programRequest.ID).First(&existingPlan).Error; err != nil {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{"error": "Plan bulunamadı"})
+	}
+
+	if err := database.Conn.Model(&existingPlan).Update("Durum", "Devam ediyor").Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Plan durumu güncelleme sırasında bir hata oluştu"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"message": "Plan başarıyla devam ediyor"})
 }
 
 func KullanıcıProgramları(c echo.Context) error {
@@ -206,10 +282,27 @@ func Programlar(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"programlar": existingPlans})
 }
 
-func AylıkPlanlar() {
-
+func AylıkPlanlar(c echo.Context) error {
+	anlık_zaman := time.Now()
+	ay := anlık_zaman.Month()
+	baslangicZamani := time.Date(anlık_zaman.Year(), ay, 1, 0, 0, 0, 0, anlık_zaman.Location())
+	bitisZamani := baslangicZamani.AddDate(0, 1, 0).Add(-time.Second)
+	var existingPlans []model.Plan
+	if err := database.Conn.Where("gun >= ? AND gun <= ?", baslangicZamani, bitisZamani).Find(&existingPlans).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Veritabanından planlar alınırken bir hata oluştu"})
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{"programlar": existingPlans})
 }
 
-func HaftalıkPlanlar() {
+func HaftalıkPlanlar(c echo.Context) error {
+	anlikZaman := time.Now()
+	baslangicZamani := anlikZaman.AddDate(0, 0, -int(anlikZaman.Weekday())+1)
+	bitisZamani := baslangicZamani.AddDate(0, 0, 6)
 
+	var existingPlans []model.Plan
+	if err := database.Conn.Where("gun >= ? AND gun <= ?", baslangicZamani, bitisZamani).Find(&existingPlans).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Veritabanından planlar alınırken bir hata oluştu"})
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"programlar": existingPlans})
 }
