@@ -5,6 +5,7 @@ import (
 	"ders-programi/database"
 	"ders-programi/model"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -26,7 +27,7 @@ func ProgramOlustur(c echo.Context) error {
 	var programRequest struct {
 		Baslik          string    `json:"başlık"`
 		Plan            string    `json:"plan"`
-		Gun             time.Time `json:"gün"`
+		Gun             string    `json:"gün"` // Gün alanı sadece string olarak kabul edilecek
 		BaslangicZamani time.Time `json:"başlangıç_zamanı"`
 		BitisZamani     time.Time `json:"bitiş_zamanı"`
 		Durum           string    `json:"durum"`
@@ -36,7 +37,6 @@ func ProgramOlustur(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Hatalı parametre: " + err.Error()})
 	}
 
-	// Zaman kontrolü yapılacak
 	err := zamanKontrol(programRequest.BaslangicZamani, programRequest.BitisZamani)
 
 	if err != nil {
@@ -48,11 +48,17 @@ func ProgramOlustur(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"error": err.Error()})
 	}
 
+	// Günü zaman cinsine dönüştür
+	gunZamani, err := time.Parse("02-01-2006", programRequest.Gun)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"error": "Gün formatı hatalı: " + err.Error()})
+	}
+
 	newPlan := model.Plan{
 		UserID:          UserID,
 		Baslik:          programRequest.Baslik,
 		Plan:            programRequest.Plan,
-		Gun:             programRequest.Gun,
+		Gun:             gunZamani,
 		BaslangicZamani: programRequest.BaslangicZamani,
 		BitisZamani:     programRequest.BitisZamani,
 		Durum:           programRequest.Durum,
@@ -62,7 +68,6 @@ func ProgramOlustur(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Plan oluşturma database tarafında başarısız."})
 	}
 
-	// Başarılı bir şekilde tamamlandı mesajını döndür
 	return c.JSON(http.StatusOK, map[string]interface{}{"message": "Program başarıyla oluşturuldu", "program": newPlan})
 }
 
@@ -282,27 +287,34 @@ func Programlar(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{"programlar": existingPlans})
 }
 
-func AylıkPlanlar(c echo.Context) error {
-	anlık_zaman := time.Now()
-	ay := anlık_zaman.Month()
-	baslangicZamani := time.Date(anlık_zaman.Year(), ay, 1, 0, 0, 0, 0, anlık_zaman.Location())
-	bitisZamani := baslangicZamani.AddDate(0, 1, 0).Add(-time.Second)
+func AylıkProgramlar(c echo.Context) error {
+	anlikZaman := time.Now()
+	baslangicZamani := anlikZaman
+	endDbitisZamaniate := baslangicZamani.AddDate(0, 0, 30)
+
+	fmt.Println(baslangicZamani)
+	fmt.Println(endDbitisZamaniate)
+
 	var existingPlans []model.Plan
-	if err := database.Conn.Where("gun >= ? AND gun <= ?", baslangicZamani, bitisZamani).Find(&existingPlans).Error; err != nil {
+	if err := database.Conn.Where("user_id = ? AND gun >= ? AND gun <= ?", 1, baslangicZamani.Format("2006-01-02"), endDbitisZamaniate.Format("2006-01-02")).Find(&existingPlans).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Veritabanından planlar alınırken bir hata oluştu"})
 	}
-	return c.JSON(http.StatusOK, map[string]interface{}{"programlar": existingPlans})
+
+	return c.JSON(http.StatusOK, map[string]interface{}{"aylık_programlar": existingPlans})
 }
 
-func HaftalıkPlanlar(c echo.Context) error {
+func HaftalıkProgramlar(c echo.Context) error {
 	anlikZaman := time.Now()
-	baslangicZamani := anlikZaman.AddDate(0, 0, -int(anlikZaman.Weekday())+1)
+	baslangicZamani := time.Date(anlikZaman.Year(), anlikZaman.Month(), anlikZaman.Day(), 0, 0, 0, 0, anlikZaman.Location())
 	bitisZamani := baslangicZamani.AddDate(0, 0, 6)
 
+	fmt.Println(baslangicZamani)
+	fmt.Println(bitisZamani)
+
 	var existingPlans []model.Plan
-	if err := database.Conn.Where("gun >= ? AND gun <= ?", baslangicZamani, bitisZamani).Find(&existingPlans).Error; err != nil {
+	if err := database.Conn.Where("user_id = ? AND gun >= ? AND gun <= ?", 1, baslangicZamani, bitisZamani).Find(&existingPlans).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{"error": "Veritabanından planlar alınırken bir hata oluştu"})
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{"programlar": existingPlans})
+	return c.JSON(http.StatusOK, map[string]interface{}{"haftalık_program": existingPlans})
 }
